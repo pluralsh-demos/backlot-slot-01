@@ -109,7 +109,7 @@ jobs:
               .
           fi
 
-      - name: Bump deploy/values.yaml
+      - name: Bump deploy values
         env:
           TAG: ${{ steps.tag.outputs.tag }}
         run: |
@@ -119,6 +119,9 @@ jobs:
           from pathlib import Path
 
           path = Path("deploy/values.yaml")
+          # Plural tars only the chart folder and rejects a values path that
+          # contains "..", so the slot ServiceDeployment reads this copy.
+          release_path = Path("deploy/chart/release-values.yaml")
           tag = os.environ["TAG"]
           sections = {"api", "web", "worker"}
           current = None
@@ -136,15 +139,17 @@ jobs:
           missing = sections - found
           if missing:
               raise SystemExit(f"did not find image tags for {', '.join(sorted(missing))}")
-          path.write_text("".join(lines))
+          text = "".join(lines)
+          path.write_text(text)
+          release_path.write_text(text)
           PY
 
-          if git diff --quiet -- deploy/values.yaml; then
+          if git diff --quiet -- deploy/values.yaml deploy/chart/release-values.yaml; then
             echo "api.image.tag, web.image.tag, and worker.image.tag already match ${TAG}"
             exit 0
           fi
 
-          git add deploy/values.yaml
+          git add deploy/values.yaml deploy/chart/release-values.yaml
           git -c user.name="github-actions[bot]" \
               -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
               commit -m "Record the content-hash image tag so the slot rolls out this source tree."

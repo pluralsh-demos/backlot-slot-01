@@ -2,8 +2,8 @@
 # Print the image tag for this source tree: the first 12 hex chars of sha256
 # over `git ls-files -s` for the files that go into the API and web images.
 # Blob ids plus paths stay the same when the tree is copied into a slot repo.
-# deploy/values.yaml is outside the hash, so the tag-bump commit does not
-# change the tag.
+# deploy/values.yaml and deploy/chart/release-values.yaml are outside the
+# hash, so the tag-bump commit does not change the tag.
 set -euo pipefail
 
 root=$(git rev-parse --show-toplevel)

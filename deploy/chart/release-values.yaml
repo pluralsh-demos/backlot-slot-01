@@ -1,0 +1,53 @@
+pack:
+  hostnamePrefix: poster-meteor
+
+# The slot ServiceDeployment supplies the number. It stays zero-padded so the
+# ingress host is poster-meteor-01.backlot.plural.sh.
+slot:
+  number: "01"
+
+domain: backlot.plural.sh
+
+api:
+  image:
+    repository: ghcr.io/pluralsh-demos/poster-meteor
+    tag: 70b82b319298
+  replicaCount: 3
+  autoscaling:
+    minReplicas: 3
+    maxReplicas: 6
+  db:
+    poolMax: 8
+
+web:
+  image:
+    repository: ghcr.io/pluralsh-demos/poster-meteor-web
+    tag: 70b82b319298
+
+worker:
+  image:
+    repository: ghcr.io/pluralsh-demos/poster-meteor
+    tag: 70b82b319298
+  replicaCount: 2
+  db:
+    poolMax: 4
+  queues:
+    render:
+      concurrency: 1
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+
+postgres:
+  instances: 1
+  database: poster_meteor
+  owner: poster
+  # CNPG postgresql.parameters values are strings.
+  maxConnections: "60"
+  storage:
+    size: 10Gi
+
+ingress:
+  className: nginx
+  tlsSecretName: backlot-wildcard-tls

@@ -161,7 +161,7 @@ Every log line includes `pack` (`poster-meteor`), `service` (`api`), `route` (th
 
 ## Deploy
 
-The Helm chart in `deploy/chart` is named `poster-meteor`. A Backlot slot points a ServiceDeployment at that chart and at `deploy/values.yaml`. Each slot has its own namespace, so the workloads keep short names. `deploy/chart/values.yaml` repeats the same defaults, so `helm template` works with no extra file. Release automation patches `deploy/values.yaml` only.
+The Helm chart in `deploy/chart` is named `poster-meteor`. A Backlot slot points a ServiceDeployment at that chart and at `deploy/chart/release-values.yaml`, because Plural packages only the chart folder. Each slot has its own namespace, so the workloads keep short names. `deploy/chart/values.yaml` repeats the same defaults with image tag `dev`, so `helm template` works with no extra file. Release automation patches `deploy/values.yaml` and writes the same bytes to `deploy/chart/release-values.yaml` in that commit. PR automations keep editing `deploy/values.yaml`.
 
 ```bash
 helm lint deploy/chart -f deploy/values.yaml
