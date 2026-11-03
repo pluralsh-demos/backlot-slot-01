@@ -4,3 +4,4 @@ description: Poster Meteor API, storefront, and Postgres for one Backlot slot
 type: application
 version: 0.1.0
 appVersion: "dev"
+# PROD-5316 proof marker. Chart comment only; rendered manifests stay the same.
