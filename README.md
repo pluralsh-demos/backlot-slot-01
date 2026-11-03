@@ -193,4 +193,4 @@ On a fresh install the Cluster and `poster-meteor-app` do not exist when the pre
 
 `poster-meteor-seed` runs after install and upgrade. It waits for Postgres, runs migrate, then `node apps/api/dist/seed.js`. Seed inserts the 2000 historical orders only when `orders` is empty, so a second install does not insert them again.
 
-Hook Jobs use `helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded`. See `docs/runbook.md` for the names a slot operator uses.
+Hook Jobs use `helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded`. See `workbench-skills/runbook.md` for the names a slot operator uses.
