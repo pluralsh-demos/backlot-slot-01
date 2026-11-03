@@ -1,0 +1,1 @@
+Temporary marker for the PROD-5315 live reset. slotctl reset closes this pull request and deletes this branch.
