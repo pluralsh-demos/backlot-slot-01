@@ -1,0 +1,23 @@
+# Suspended until reset creates a Job from this template. The schedule is
+# required by CronJob and unused while suspend is true.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: poster-meteor-seed
+  labels:
+    {{- include "poster-meteor.workloadLabels" (dict "root" . "name" "seed") | nindent 4 }}
+spec:
+  schedule: "0 0 1 1 *"
+  suspend: true
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    metadata:
+      labels:
+        {{- include "poster-meteor.workloadLabels" (dict "root" . "name" "seed") | nindent 8 }}
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 600
+      template:
+        {{- include "poster-meteor.seed.podTemplate" . | nindent 8 }}

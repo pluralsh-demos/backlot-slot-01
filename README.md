@@ -178,8 +178,9 @@ With the defaults, the rendered host is `poster-meteor-01.backlot.plural.sh`. Th
 | HorizontalPodAutoscaler | `api` | `autoscaling/v2`. Minimum and maximum are `api.autoscaling.minReplicas` and `maxReplicas` (3 and 6). CPU target is 70% of the request. |
 | Deployment, Service | `web` | Port 8080. Image `ghcr.io/pluralsh-demos/poster-meteor-web:<web.image.tag>`. |
 | Ingress | `poster-meteor` | Class `nginx`. `/api` goes to `api`, `/` goes to `web`. TLS secret `backlot-wildcard-tls`. |
-| Job | `poster-meteor-migrate` | `pre-install,pre-upgrade` hook. |
-| Job | `poster-meteor-seed` | `post-install,post-upgrade` hook. |
+| Job | `poster-meteor-migrate-<api.image.tag>` | `pre-install,pre-upgrade` hook. The tag is lowercased and limited to DNS-1123, so a new image is a new Job. |
+| Job | `poster-meteor-seed-<api.image.tag>` | `post-install,post-upgrade` hook. Named the same way as the migrate Job. |
+| CronJob | `poster-meteor-seed` | Suspended. Same pod template as the seed Job. Reset creates a one-shot Job from it. |
 
 This release renders `api` and `web`. The `worker` keys in `deploy/values.yaml` stay there so a later overlay can set image, replica count, pool size, render concurrency, and resources. `worker.image.repository` matches the API image.
 
@@ -189,8 +190,8 @@ The API container gets `DATABASE_URL`, `POOL_MAX` from `api.db.poolMax` (8), and
 
 Install needs the CloudNativePG operator in the cluster. Build `Dockerfile` and `Dockerfile.web`, then `helm upgrade --install`.
 
-On a fresh install the Cluster and `poster-meteor-app` do not exist when the pre-install hook runs. `poster-meteor-migrate` exits 0 when `DATABASE_URL` is unset. When the secret is present, the hook waits for Postgres and runs `node apps/api/dist/migrate.js` before the API rolls. The `api` initContainer waits for the same secret and runs that migrate command before the process listens. `migrate` takes an advisory lock, so the hook and the initContainer can both run it.
+On a fresh install the Cluster and `poster-meteor-app` do not exist when the pre-install hook runs. `poster-meteor-migrate-<api.image.tag>` exits 0 when `DATABASE_URL` is unset. When the secret is present, the hook waits for Postgres and runs `node apps/api/dist/migrate.js` before the API rolls. The `api` initContainer waits for the same secret and runs that migrate command before the process listens. `migrate` takes an advisory lock, so the hook and the initContainer can both run it.
 
-`poster-meteor-seed` runs after install and upgrade. It waits for Postgres, runs migrate, then `node apps/api/dist/seed.js`. Seed inserts the 2000 historical orders only when `orders` is empty, so a second install does not insert them again.
+`poster-meteor-seed-<api.image.tag>` runs after install and upgrade. It waits for Postgres, runs migrate, then `node apps/api/dist/seed.js`. Seed inserts the 2000 historical orders only when `orders` is empty, so a second install does not insert them again. CronJob `poster-meteor-seed` stays suspended and carries that same pod template. A reset creates a Job from the CronJob after the database is wiped. The schedule does not run it.
 
 Hook Jobs use `helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded`. See `workbench-skills/runbook.md` for the names a slot operator uses.

@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: poster-meteor-migrate
+  name: {{ include "poster-meteor.hookJobName" (dict "root" . "kind" "migrate") }}
   labels:
     {{- include "poster-meteor.workloadLabels" (dict "root" . "name" "migrate") | nindent 4 }}
   annotations:
