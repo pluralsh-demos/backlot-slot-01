@@ -48,8 +48,9 @@ Names are unqualified. The chart is `deploy/chart` (`poster-meteor`).
 | API HorizontalPodAutoscaler | `api` |
 | Web Deployment and Service | `web` (port 8080) |
 | Ingress | `poster-meteor` |
-| Migrate Job | `poster-meteor-migrate` |
-| Seed Job | `poster-meteor-seed` |
+| Migrate Job | `poster-meteor-migrate-<api.image.tag>` |
+| Seed Job | `poster-meteor-seed-<api.image.tag>` |
+| Seed CronJob | `poster-meteor-seed` (suspended) |
 
 The chart renders `api` and `web`. It does not render a worker. The `worker` keys in `deploy/values.yaml` are unused by the templates.
 
@@ -67,17 +68,19 @@ Images are `ghcr.io/pluralsh-demos/poster-meteor` (API, from `Dockerfile`) and `
 
 Migrations are `apps/api/migrations/*.sql`. `node apps/api/dist/migrate.js` applies them in filename order and records each filename in `schema_migrations`. A file already recorded is skipped. The command holds an advisory lock.
 
-`poster-meteor-migrate` is a `pre-install,pre-upgrade` hook. On a first install, before `poster-meteor-app` exists, the hook exits 0. When the secret exists it waits until Postgres accepts a connection, then migrates, before API pods roll. The `api` initContainer runs the same command, and the server does not listen until that container exits. The lock lets the hook and the initContainer overlap.
+`poster-meteor-migrate-<api.image.tag>` is a `pre-install,pre-upgrade` hook. The tag is `api.image.tag`, lowercased and limited to DNS-1123, so a new image is a new Job. On a first install, before `poster-meteor-app` exists, the hook exits 0. When the secret exists it waits until Postgres accepts a connection, then migrates, before API pods roll. The `api` initContainer runs the same command, and the server does not listen until that container exits. The lock lets the hook and the initContainer overlap.
 
-`poster-meteor-seed` is a `post-install,post-upgrade` hook. It waits for Postgres, migrates, then runs `node apps/api/dist/seed.js`. Seed inserts 2000 historical orders only when `orders` is empty. A later upgrade leaves those rows in place.
+`poster-meteor-seed-<api.image.tag>` is a `post-install,post-upgrade` hook, named the same way. It waits for Postgres, migrates, then runs `node apps/api/dist/seed.js`. Seed inserts 2000 historical orders only when `orders` is empty. A later upgrade leaves those rows in place.
 
-Both Jobs delete themselves on success (`before-hook-creation,hook-succeeded`).
+CronJob `poster-meteor-seed` stays suspended. It uses the same pod template as the seed hook. A reset creates a Job from it after the database is wiped. The schedule does not run it.
+
+Both hook Jobs delete themselves on success (`before-hook-creation,hook-succeeded`).
 
 Checkout capacity follows `api.autoscaling.minReplicas` and `api.autoscaling.maxReplicas` (3 and 6). The Deployment replica count is the HPA minimum. The API container requests 100m CPU and 256Mi memory, and the HPA targets 70% CPU. `POOL_MAX` on the API is `api.db.poolMax` (8). Postgres `max_connections` is the string `postgres.maxConnections` (`"60"`). Changing these is a values change. It does not build an image and it does not create worker pods.
 
 ## How a release ships
 
-Pull requests run `.github/workflows/ci.yml`: install, test, build the API and the storefront, and `helm lint deploy/chart -f deploy/values.yaml`.
+Pull requests run `.github/workflows/ci.yml`: install, test, build the API and the storefront, `helm lint deploy/chart -f deploy/values.yaml`, and a `helm template` check that the seed and migrate Jobs include `api.image.tag` and that CronJob `poster-meteor-seed` is suspended.
 
 A push to `main` that changes `apps/**`, `package.json`, `package-lock.json`, `Dockerfile`, `Dockerfile.web`, or `deploy/web/**` runs `.github/workflows/release.yml`.
 

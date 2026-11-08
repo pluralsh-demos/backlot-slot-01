@@ -36,6 +36,16 @@ poster-meteor
 {{- printf "%s:%s" .Values.api.image.repository .Values.api.image.tag -}}
 {{- end }}
 
+{{/*
+Hook Job name: poster-meteor-<kind>-<tag>. The tag is api.image.tag, lowercased,
+with characters outside DNS-1123 removed. The name is kept within 63 characters.
+*/}}
+{{- define "poster-meteor.hookJobName" -}}
+{{- $tag := .root.Values.api.image.tag | toString | lower -}}
+{{- $tag = regexReplaceAll "[^a-z0-9-]" $tag "" | trimAll "-" -}}
+{{- printf "poster-meteor-%s-%s" .kind $tag | trunc 63 | trimAll "-" -}}
+{{- end }}
+
 {{- define "poster-meteor.web.image" -}}
 {{- printf "%s:%s" .Values.web.image.repository .Values.web.image.tag -}}
 {{- end }}
@@ -109,4 +119,38 @@ done
 {{- range .steps }}
 {{ . }}
 {{- end }}
+{{- end }}
+
+{{/*
+Pod template shared by the seed hook Job and the poster-meteor-seed CronJob.
+*/}}
+{{- define "poster-meteor.seed.podTemplate" -}}
+metadata:
+  labels:
+    {{- include "poster-meteor.workloadLabels" (dict "root" . "name" "seed") | nindent 4 }}
+spec:
+  restartPolicy: Never
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+  containers:
+    - name: seed
+      image: {{ include "poster-meteor.api.image" . | quote }}
+      imagePullPolicy: IfNotPresent
+      command: ["sh", "-c"]
+      args:
+        - |
+{{ include "poster-meteor.db.script" (dict "steps" (list "node apps/api/dist/migrate.js" "exec node apps/api/dist/seed.js")) | indent 10 }}
+      env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "poster-meteor.databaseSecret" . }}
+              key: uri
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
 {{- end }}

@@ -29,3 +29,52 @@ jobs:
 
       - uses: azure/setup-helm@v5
       - run: helm lint deploy/chart -f deploy/values.yaml
+      - name: helm template
+        run: |
+          set -euo pipefail
+          tag=$(awk '
+            $0 ~ /^api:/ { in_api = 1; next }
+            in_api && $0 ~ /^[^ ]/ { exit }
+            in_api && $1 == "tag:" {
+              gsub(/"/, "", $2)
+              print $2
+              exit
+            }
+          ' deploy/values.yaml)
+          if [ -z "$tag" ]; then
+            echo "api.image.tag missing from deploy/values.yaml" >&2
+            exit 1
+          fi
+          helm template poster-meteor deploy/chart -f deploy/values.yaml | tag="$tag" python3 -c '
+          import os, sys
+          tag = os.environ["tag"]
+          text = sys.stdin.read()
+          want = {
+              "poster-meteor-seed-" + tag: False,
+              "poster-meteor-migrate-" + tag: False,
+          }
+          cron = False
+          for doc in text.split("---\n"):
+              kind = name = suspend = None
+              in_spec = False
+              for line in doc.splitlines():
+                  if line.startswith("kind:"):
+                      kind = line.split(":", 1)[1].strip()
+                  elif line.startswith("spec:"):
+                      in_spec = True
+                  elif line.startswith("  name:") and name is None:
+                      name = line.split(":", 1)[1].strip()
+                  elif in_spec and line.startswith("  suspend:"):
+                      suspend = line.split(":", 1)[1].strip()
+              if kind == "Job" and name in want:
+                  want[name] = True
+              if kind == "CronJob" and name == "poster-meteor-seed":
+                  if suspend != "true":
+                      sys.exit("poster-meteor-seed suspend is %r" % suspend)
+                  cron = True
+          missing = [name for name, found in want.items() if not found]
+          if missing:
+              sys.exit("missing Jobs: " + ", ".join(missing))
+          if not cron:
+              sys.exit("CronJob poster-meteor-seed not rendered")
+          '
