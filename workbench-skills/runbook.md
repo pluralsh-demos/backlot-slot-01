@@ -87,7 +87,19 @@ Plural syncs `deploy/chart` with `release-values.yaml`. The deployment supplies 
 
 A commit that changes only the values files does not run `release.yml`. The tags in that commit are the tags that deploy.
 
+## Database connections
+
+SQLSTATE `53300` (`sorry, too many clients already`) means the API pools want more connections than Postgres allows.
+
+`api.autoscaling.maxReplicas` × `api.db.poolMax` must stay under `postgres.maxConnections` minus 3 superuser-reserved connections, with headroom. The current values are 6 × 8 against `"60"`.
+
+The fix is a pull request that edits both `deploy/values.yaml` and `deploy/chart/release-values.yaml`. Lower `maxReplicas`, lower `poolMax`, or raise `maxConnections`. Raising `maxConnections` restarts the single Postgres instance.
+
+Do not scale with `kubectl`. Do not roll back an image for a connection error.
+
 ## Rolling back
+
+SQLSTATE `42703` is the trigger: checkout is still failing after the running image's migrate job succeeded, and the error is a missing column.
 
 To undo a release, open a pull request that sets `api.image.tag`, `web.image.tag`, and `worker.image.tag` back to the previous tag, in both `deploy/values.yaml` and `deploy/chart/release-values.yaml`. That tag is already in the registry. Do not rebuild, and do not edit the chart's `values.yaml`.
 
