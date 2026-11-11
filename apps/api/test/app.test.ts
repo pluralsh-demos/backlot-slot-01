@@ -338,6 +338,33 @@ describe("poster meteor api", () => {
     );
     expect(db.calls.some((sql) => sql === "ROLLBACK")).toBe(true);
   });
+
+  it("counts a refused connection as a database error and hides the sqlstate", async () => {
+    const logs = captureLogs();
+    const db = memoryOrders({
+      failConnect: true,
+      code: "53300",
+      message: "sorry, too many clients already",
+    });
+    app = buildApp({ logStream: logs.stream, pool: db.pool });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/orders",
+      payload: orderBody(),
+    });
+
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toEqual({ error: "We couldn't place your order" });
+    expect(response.body).not.toContain("53300");
+    expect(await counter(app, "db_errors_total", 'sqlstate="53300"')).toBe(1);
+    expect(await counter(app, "transactions_total", 'result="error"')).toBe(1);
+    expect(await counter(app, "transactions_total", 'result="success"')).toBe(0);
+
+    const dbError = logLines(logs.text()).find((line) => line.sqlstate === "53300");
+    expect(dbError?.pgMessage).toBe("sorry, too many clients already");
+    expect(db.calls).not.toContain("BEGIN");
+  });
 });
 
 function orderBody(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -388,7 +415,12 @@ type StoredOrder = {
   items: StoredItem[];
 };
 
-function memoryOrders(options?: { failOn?: string; code?: string; message?: string }): {
+function memoryOrders(options?: {
+  failOn?: string;
+  failConnect?: boolean;
+  code?: string;
+  message?: string;
+}): {
   pool: OrderDb;
   calls: string[];
 } {
@@ -462,7 +494,14 @@ function memoryOrders(options?: { failOn?: string; code?: string; message?: stri
       totalCount: 0,
       idleCount: 0,
       waitingCount: 0,
-      connect: async () => client,
+      connect: async () => {
+        if (options?.failConnect) {
+          const error = new Error(options.message ?? "database error") as Error & { code?: string };
+          error.code = options.code ?? "XX000";
+          throw error;
+        }
+        return client;
+      },
     },
   };
 }
