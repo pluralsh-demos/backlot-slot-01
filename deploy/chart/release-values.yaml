@@ -17,7 +17,7 @@ api:
     minReplicas: 12
     maxReplicas: 20
   db:
-    poolMax: 8
+    poolMax: 2
 
 web:
   image:
