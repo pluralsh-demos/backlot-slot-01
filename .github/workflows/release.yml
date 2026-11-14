@@ -73,41 +73,13 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
-      - name: Publish API image
+      - name: Publish images
         env:
           TAG: ${{ steps.tag.outputs.tag }}
-          IMAGE: ${{ steps.images.outputs.api }}
+          IMAGE_API: ${{ steps.images.outputs.api }}
+          IMAGE_WEB: ${{ steps.images.outputs.web }}
           GIT_SHA: ${{ github.sha }}
-        run: |
-          if docker buildx imagetools inspect "${IMAGE}:${TAG}" >/dev/null 2>&1; then
-            echo "Reusing ${IMAGE}:${TAG}"
-          else
-            docker buildx build \
-              --file Dockerfile \
-              --build-arg "GIT_SHA=${GIT_SHA}" \
-              --tag "${IMAGE}:${TAG}" \
-              --provenance=false \
-              --sbom=false \
-              --push \
-              .
-          fi
-
-      - name: Publish web image
-        env:
-          TAG: ${{ steps.tag.outputs.tag }}
-          IMAGE: ${{ steps.images.outputs.web }}
-        run: |
-          if docker buildx imagetools inspect "${IMAGE}:${TAG}" >/dev/null 2>&1; then
-            echo "Reusing ${IMAGE}:${TAG}"
-          else
-            docker buildx build \
-              --file Dockerfile.web \
-              --tag "${IMAGE}:${TAG}" \
-              --provenance=false \
-              --sbom=false \
-              --push \
-              .
-          fi
+        run: ./scripts/publish-images.sh
 
       - name: Bump deploy values
         env:
