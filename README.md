@@ -195,3 +195,13 @@ On a fresh install the Cluster and `poster-meteor-app` do not exist when the pre
 `poster-meteor-seed-<api.image.tag>` runs after install and upgrade. It waits for Postgres, runs migrate, then `node apps/api/dist/seed.js`. Seed inserts the 2000 historical orders only when `orders` is empty, so a second install does not insert them again. CronJob `poster-meteor-seed` stays suspended and carries that same pod template. A reset creates a Job from the CronJob after the database is wiped. The schedule does not run it.
 
 Hook Jobs use `helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded`. See `workbench-skills/runbook.md` for the names a slot operator uses.
+
+## Canonical tags
+
+A `canonical-*` tag is the healthy tree a Backlot slot resets onto. Cutting one is not finished until the **Prebuild** workflow is green.
+
+1. Push `canonical-vN` (or run **Prebuild** with `workflow_dispatch` and input `tag` for an existing tag).
+2. Wait until Prebuild has published `ghcr.io/pluralsh-demos/poster-meteor` and `ghcr.io/pluralsh-demos/poster-meteor-web` for the clean tree and every `changesApps` overlay (today: `missing-migration`).
+3. Then reset slots onto the tag.
+
+A change under `apps/` (or the other paths `scripts/image-tag.sh` hashes) makes every overlay image a new tag. Slot `release.yml` can only reuse those tags; it cannot push them. Do not reset until Prebuild has run.
