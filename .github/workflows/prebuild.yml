@@ -1,0 +1,77 @@
+name: Prebuild
+
+on:
+  push:
+    tags:
+      - "canonical-*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Canonical tag to prebuild (for example canonical-v2)
+        required: true
+        type: string
+
+# packages:write so this template can push GHCR tags that slot release.yml
+# only reuses. Do not commit values files here; that stays on release.yml.
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  prebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - id: ref
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUSH_TAG: ${{ github.ref_name }}
+          DISPATCH_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            tag=$DISPATCH_TAG
+          else
+            tag=$PUSH_TAG
+          fi
+          tag=${tag#refs/tags/}
+          case "$tag" in
+            canonical-[A-Za-z0-9._-]* ) ;;
+            *)
+              echo "tag must match canonical-*, got: $tag" >&2
+              exit 1
+              ;;
+          esac
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.ref.outputs.tag }}
+          persist-credentials: false
+
+      # Overlays live in private pluralsh/backlot-platform. The App is
+      # backlot-platform-read (pluralsh-demos), Contents: Read only.
+      - uses: actions/create-github-app-token@v2
+        id: pack
+        with:
+          app-id: ${{ vars.BACKLOT_PLATFORM_APP_ID }}
+          private-key: ${{ secrets.BACKLOT_PLATFORM_APP_PRIVATE_KEY }}
+          owner: pluralsh
+          repositories: backlot-platform
+
+      - uses: actions/checkout@v4
+        with:
+          repository: pluralsh/backlot-platform
+          path: .backlot-platform
+          persist-credentials: false
+          token: ${{ steps.pack.outputs.token }}
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Publish canonical and scenario images
+        run: GIT_SHA=$(git rev-parse HEAD) ./scripts/prebuild-images.sh
