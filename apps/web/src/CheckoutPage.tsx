@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiError, createOrder, type CreateOrderRequest } from "./api";
 import { checkoutLines, clearCart, type CartLine } from "./cart";
+import { pickSampleBuyer } from "./sampleBuyers";
 import {
   fallbackCatalog,
   isCatalog,
@@ -51,6 +52,30 @@ export function CheckoutPage() {
   const [ship, setShip] = useState<ShipFields>(emptyShip);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const lastBuyerIndex = useRef<number | undefined>(undefined);
+
+  function fillWithRandomBuyer(): void {
+    const { buyer, index } = pickSampleBuyer(lastBuyerIndex.current);
+    lastBuyerIndex.current = index;
+    setShip({
+      email: buyer.email,
+      name: buyer.name,
+      line1: buyer.line1,
+      line2: buyer.line2,
+      city: buyer.city,
+      region: buyer.region,
+      postalCode: buyer.postalCode,
+      country: buyer.country,
+      brand: buyer.brand,
+      last4: buyer.last4,
+    });
+    setLines((current) =>
+      current.map((line) =>
+        productNeedsCustomText(catalog, line.sku) ? { ...line, customText: buyer.customText } : line,
+      ),
+    );
+    setError("");
+  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -170,6 +195,11 @@ export function CheckoutPage() {
     <main className="page">
       <h1>Checkout</h1>
       <p className="lede">Shipping and a demo card. Payment is accepted here and ignored by the store.</p>
+      <div className="checkout-tools">
+        <button className="fill-buyer" type="button" onClick={fillWithRandomBuyer}>
+          Fill with a random buyer
+        </button>
+      </div>
       <form className="layout" onSubmit={(event) => void onSubmit(event)}>
         <div className="stack">
           <section className="panel">
