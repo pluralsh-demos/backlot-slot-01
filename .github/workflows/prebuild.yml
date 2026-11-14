@@ -48,6 +48,13 @@ jobs:
           ref: ${{ steps.ref.outputs.tag }}
           persist-credentials: false
 
+      # canonical-v2 (and any tag cut before these scripts landed) does not
+      # contain prebuild-images.sh. Take the scripts from the workflow commit.
+      - uses: actions/checkout@v4
+        with:
+          path: .prebuild
+          persist-credentials: false
+
       # Overlays live in private pluralsh/backlot-platform. The App is
       # backlot-platform-read (pluralsh-demos), Contents: Read only.
       - uses: actions/create-github-app-token@v2
@@ -74,4 +81,8 @@ jobs:
       - uses: docker/setup-buildx-action@v3
 
       - name: Publish canonical and scenario images
-        run: GIT_SHA=$(git rev-parse HEAD) ./scripts/prebuild-images.sh
+        run: |
+          set -euo pipefail
+          cp .prebuild/scripts/prebuild-images.sh .prebuild/scripts/publish-images.sh scripts/
+          chmod +x scripts/prebuild-images.sh scripts/publish-images.sh
+          GIT_SHA=$(git rev-parse HEAD) ./scripts/prebuild-images.sh
