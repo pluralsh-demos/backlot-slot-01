@@ -78,10 +78,23 @@ type CheckoutMetrics = Pick<ApiMetrics, "dbErrorsTotal" | "transactionsTotal">;
 type ReadMetrics = Pick<ApiMetrics, "dbErrorsTotal">;
 
 const INSERT_ORDER = `
-  INSERT INTO orders (number, email, ship_to, status, subtotal, tax, total, levy_ref)
-  VALUES ('PM-' || nextval('order_number_seq')::text, $1, $2::jsonb, 'received', $3, NULL, $3, NULL)
+  INSERT INTO orders (number, email, ship_to, status, subtotal, tax, total, levy_ref, print_dimensions)
+  VALUES ('PM-' || nextval('order_number_seq')::text, $1, $2::jsonb, 'received', $3, NULL, $3, NULL, $4)
   RETURNING id, number, status, subtotal, total
 `;
+
+const PRINT_DIMENSIONS: Record<string, string> = {
+  A3: "297x420",
+  A2: "420x594",
+  A1: "594x841",
+};
+
+function printDimensions(size: string | undefined): string {
+  if (!size) throw new Error("order has no items");
+  const dimensions = PRINT_DIMENSIONS[size];
+  if (!dimensions) throw new Error("unknown size");
+  return dimensions;
+}
 
 const INSERT_ITEM = `
   INSERT INTO order_items (order_id, sku, size, frame, custom_text, unit_price)
@@ -331,6 +344,7 @@ export async function placeOrder(
         parsed.email,
         JSON.stringify(parsed.shipTo),
         parsed.subtotal,
+        printDimensions(parsed.items[0]?.size),
       ]),
     );
     const row = inserted.rows[0];
