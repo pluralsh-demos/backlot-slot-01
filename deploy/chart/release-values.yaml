@@ -11,7 +11,7 @@ domain: backlot.plural.sh
 api:
   image:
     repository: ghcr.io/pluralsh-demos/poster-meteor
-    tag: 9802cb4f9ba9
+    tag: bf9969d70727
   replicaCount: 3
   autoscaling:
     minReplicas: 3
@@ -22,12 +22,12 @@ api:
 web:
   image:
     repository: ghcr.io/pluralsh-demos/poster-meteor-web
-    tag: 9802cb4f9ba9
+    tag: bf9969d70727
 
 worker:
   image:
     repository: ghcr.io/pluralsh-demos/poster-meteor
-    tag: 9802cb4f9ba9
+    tag: bf9969d70727
   replicaCount: 2
   db:
     poolMax: 4
